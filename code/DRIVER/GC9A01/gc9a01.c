@@ -2,25 +2,27 @@
 
 #define GC9A01_send_color(color,len)	gc9a01_hal_data_send( (uint8_t*)color , len*2 )
 
-static void GC9A01_set_region(uint16_t x , uint16_t y , uint16_t width , uint16_t height){
+static void GC9A01_set_region(uint8_t x , uint8_t y , uint8_t width , uint8_t height){
 	uint8_t data[4];
 
 	/*Column addresses*/
-	data[0] = ( x >> 8 ) & 0xFF;
-	data[1] = x & 0xFF;
-	data[2] = ( (x+width) >> 8 ) & 0xFF;
-	data[3] = (x+width) & 0xFF;
+	data[0] = 0;
+	data[1] = x;
+	data[2] = 0;
+	data[3] = x+width;
 	gc9a01_hal_cmd_send_with_param( 0x2A , data , 4 );
 
 	/*Page addresses*/
-	data[0] = ( y >> 8) & 0xFF;
-	data[1] = y & 0xFF;
-	data[2] = ( (y+height) >> 8) & 0xFF;
-	data[3] = (y+height) & 0xFF;
+	data[0] = 0;
+	data[1] = y;
+	data[2] = 0;
+	data[3] = y+height;
 	gc9a01_hal_cmd_send_with_param( 0x2B , data , 4 );
 }
 
 void GC9A01_init(){
+	gc9a01_hal_init();
+
     gc9a01_hal_hard_reset();
     gc9a01_hal_delay_ms(100);
 
@@ -85,9 +87,11 @@ void GC9A01_set_brightness(uint8_t brightness){
 
 void GC9A01_test(){
 	uint16_t color = 0xF800;	//RED
-	GC9A01_set_region( 0 , 0 , 230 , 230 );
-	for( uint16_t temp = 0 ; temp < 230*230 ; temp++ ){
-		gc9a01_hal_data_send( (uint8_t*)&color , 2 );
+	uint8_t temp = 0x2C;
+	GC9A01_set_region( 0 , 0 , 239 , 239 );
+	gc9a01_hal_cmd_send( &temp , 1 );
+	for( uint16_t temp = 0 ; temp < 240*240 ; temp++ ){
+		GC9A01_send_color( &color , 1 );
 	}
 }
 
