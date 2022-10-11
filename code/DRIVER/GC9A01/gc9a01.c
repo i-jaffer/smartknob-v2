@@ -18,6 +18,8 @@ static void GC9A01_set_region(uint8_t x , uint8_t y , uint8_t width , uint8_t he
 	data[2] = 0;
 	data[3] = y+height;
 	gc9a01_hal_cmd_send_with_param( 0x2B , data , 4 );
+
+	gc9a01_hal_cmd_send_with_param( 0x2C , NULL , 1);
 }
 
 void GC9A01_init(){
@@ -86,10 +88,8 @@ void GC9A01_set_brightness(uint8_t brightness){
 }
 
 void GC9A01_test(){
-	uint16_t color = 0xF800;	//RED
-	uint8_t temp = 0x2C;
+	uint16_t color = 0xF800>>11;	//RED
 	GC9A01_set_region( 0 , 0 , 239 , 239 );
-	gc9a01_hal_cmd_send( &temp , 1 );
 	for( uint16_t temp = 0 ; temp < 240*240 ; temp++ ){
 		GC9A01_send_color( &color , 1 );
 	}
