@@ -1,6 +1,6 @@
 #include "gc9a01.h"
 
-#define GC9A01_send_color(color,len)	gc9a01_hal_data_send( (uint8_t*)color , len*2 )
+#define GC9A01_send_color(color,len)	gc9a01_hal_data_send( ((uint8_t*)color) , (len)*2 )
 
 static void GC9A01_set_region(uint8_t x , uint8_t y , uint8_t width , uint8_t height){
 	uint8_t data[4];
@@ -9,23 +9,28 @@ static void GC9A01_set_region(uint8_t x , uint8_t y , uint8_t width , uint8_t he
 	data[0] = 0;
 	data[1] = x;
 	data[2] = 0;
-	data[3] = x+width;
+	data[3] = x+width - 1;
 	gc9a01_hal_cmd_send_with_param( 0x2A , data , 4 );
 
 	/*Page addresses*/
 	data[0] = 0;
 	data[1] = y;
 	data[2] = 0;
-	data[3] = y+height;
+	data[3] = y+height - 1;
 	gc9a01_hal_cmd_send_with_param( 0x2B , data , 4 );
 
 	gc9a01_hal_cmd_send_with_param( 0x2C , NULL , 1);
 }
 
-void GC9A01_init(){
-	gc9a01_hal_init();
+#if INTERNAL_COLOR_SWAP
+static void swap_color(uint16_t *color){
+	uint8_t temp = *color >> 8;
+	*color = (*color << 8) | temp;
+}
+#endif
 
-    gc9a01_hal_hard_reset();
+void GC9A01_init(){
+	gc9a01_hal_hard_reset();
     gc9a01_hal_delay_ms(100);
 
     gc9a01_hal_cmd_send_with_param( 0xEF, (uint8_t*) NULL, 0);
@@ -45,7 +50,7 @@ void GC9A01_init(){
 	gc9a01_hal_cmd_send_with_param( 0x8D, (uint8_t*) "\x01", 1);
 	gc9a01_hal_cmd_send_with_param( 0x8E, (uint8_t*) "\xFF", 1);
 	gc9a01_hal_cmd_send_with_param( 0x8F, (uint8_t*) "\xFF", 1);
-	gc9a01_hal_cmd_send_with_param( 0xB6, (uint8_t*) "\x00\x00", 2);
+	gc9a01_hal_cmd_send_with_param( 0xB6, (uint8_t*) "\x00\x20", 2);
 	gc9a01_hal_cmd_send_with_param( 0x3A, (uint8_t*) "\x55", 1); // COLMOD
 	gc9a01_hal_cmd_send_with_param( 0x90, (uint8_t*) "\x08\x08\x08\x08", 4);
 	gc9a01_hal_cmd_send_with_param( 0xBD, (uint8_t*) "\x06", 1);
@@ -81,19 +86,80 @@ void GC9A01_init(){
 
 	gc9a01_hal_cmd_send_with_param( 0x29, (uint8_t*) NULL, 0);
 	gc9a01_hal_delay_ms(20);
+
+	//加上这句用于配置扫描方向以及像素点格式
+	//手册第127页 Memory Access Control 命令 0x36
+	//0000 1000
+	gc9a01_hal_cmd_send_with_param( 0x36 , (uint8_t*) "\x08" , 1 );
 }
 
 void GC9A01_set_brightness(uint8_t brightness){
 	gc9a01_hal_blk_pwm_set(brightness);
 }
 
-void GC9A01_test(){
-	uint16_t color = 0xF800>>11;	//RED
-	GC9A01_set_region( 0 , 0 , 239 , 239 );
-	for( uint16_t temp = 0 ; temp < 240*240 ; temp++ ){
+void GC9A01_sleep(void){
+	//todo
+}
+
+void GC9A01_wakeup(void){
+	//todo
+}
+
+void GC9A01_x_mirror_enable(void){
+	//todo
+}
+
+void GC9A01_x_mirror_disable(void){
+	//todo
+}
+
+void GC9A01_y_mirror_enable(void){
+	//todo
+}
+
+void GC9A01_y_mirror_disable(void){
+	//todo
+}
+
+void GC9A01_draw_map(uint8_t x,uint8_t y,uint8_t width , uint8_t hetght , uint16_t * color_map){
+	GC9A01_set_region( x , y , width , hetght );
+	#if INTERNAL_COLOR_SWAP
+	for(uint16_t temp = 0; temp < width * hetght ; temp++){
+		swap_color(color_map+temp);
+	}
+	#endif
+	GC9A01_send_color( color_map , width * hetght );
+}
+
+void GC9A01_fill_block(uint8_t x , uint8_t y , uint8_t width , uint8_t height , uint16_t color){
+	uint8_t draw_buff[DRAW_BUF_SIZE];
+	uint16_t len = width*height;
+	#if INTERNAL_COLOR_SWAP
+	swap_color( &color );
+	#endif
+	for( uint16_t temp = 0 ; temp < DRAW_BUF_SIZE/2 && temp < len; temp++ ){
+		((uint16_t*)draw_buff)[temp] = color;
+	}
+	GC9A01_set_region( x , y , width , height );
+	GC9A01_send_color( draw_buff , len );
+}
+
+#if GC9A01_TEST
+extern const uint8_t test_240x180_map[];
+void GC9A01_test(){	
+
+	//铺白色背景
+	uint16_t color = 0xFFFF;
+	GC9A01_set_region(0,0,240,240);
+	for(uint16_t temp = 0 ; temp < 240*240 ; temp++){
 		GC9A01_send_color( &color , 1 );
 	}
+
+	//绘制图片 一次最大绘制长度65535/2个像素点
+	GC9A01_draw_map( 0 , 30 , 240, 90 , (uint16_t*)test_240x180_map );
+	GC9A01_draw_map( 0 , 120 , 240, 90 , ( (uint16_t*)test_240x180_map ) + 240*90 );
 }
+#endif
 
 uint8_t GC9A01_get_brightness(){
 	return 0;
